@@ -1,4 +1,4 @@
-import { Disposable, Uri, workspace } from "vscode";
+import { Disposable, Uri, ViewColumn, window, workspace } from "vscode";
 
 export function disposeAll(items: Disposable[]): any[] {
     return items.reverse().map((d) => d.dispose());
@@ -11,6 +11,22 @@ export function isOpenedInEditor(file: Uri): boolean {
     });
 }
 
+export async function openFile(fileName: string, column: ViewColumn, preserveFocus: boolean = false) {
+    console.log("Opening " + fileName + " in " + column + " pane");
+
+    let uriFile = Uri.file(fileName);
+
+    try {
+        let document = await workspace.openTextDocument(uriFile);
+
+        await window.showTextDocument(document, column, preserveFocus);
+        console.log("Done opening " + document.fileName);
+    }
+    catch (error) {
+        console.error(error);
+    }
+}
+
 export function fistLetterUpper(str: string) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 };
@@ -18,3 +34,4 @@ export function fistLetterUpper(str: string) {
 export function replaceAll(str: string, search: string, replace: string) {
     return str.split(search).join(replace);
 }
+

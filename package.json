@@ -7,9 +7,9 @@
 	"icon": "resources/logo.png",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/93Alliance/ccls-ext"
+		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -22,6 +22,10 @@
 		"clang"
 	],
 	"activationEvents": [
+		"onLanguage:c",
+		"onLanguage:cpp",
+		"onLanguage:objective-c",
+		"onLanguage:objective-cpp",
 		"workspaceContains:CMakeLists.txt"
 	],
 	"main": "./dist/extension.js",
@@ -55,6 +59,18 @@
 				"command": "cpphelper.createUnitTest",
 				"category": "cpphelper",
 				"title": "Create unit test file"
+			},
+			{
+				"command": "cpphelper.switch",
+				"title": "Switch Header/Source"
+			},
+			{
+				"command": "cpphelper.switchRightPane",
+				"title": "Switch Header/Source To Right Pane"
+			},
+			{
+				"command": "cpphelper.switchLeftPane",
+				"title": "Switch Header/Source To Left Pane"
 			}
 		],
 		"configuration": {
@@ -104,6 +120,29 @@
 					"type": "string",
 					"default": "#include \"benchmark/benchmark.h\"\n#include \"gtest/gtest.h\"\n\nTEST(Test${fileName}, base)\n{\n}\n",
 					"description": "unit test template."
+				},
+				"cpphelper.headerSourceMappings": {
+					"type": "array",
+					"description": "Array of mappings, defaults to C++ mappings",
+					"default": [
+						{
+							"header": [
+								".h",
+								".hpp",
+								".hh",
+								".hxx"
+							],
+							"source": [
+								".cpp",
+								".c",
+								".cc",
+								".cxx",
+								".m",
+								".mm"
+							],
+							"name": "C++"
+						}
+					]
 				}
 			}
 		},
@@ -160,9 +199,7 @@
 		"webpack-cli": "^4.7.0",
 		"@types/ws": "^7.4.4"
 	},
-	"dependencies": {
-	},
+	"dependencies": {},
 	"extensionDependencies": [
-		"ms-vscode.cmake-tools"
 	]
 }

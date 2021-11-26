@@ -1,11 +1,32 @@
-import { commands, Disposable, languages, Position, Range, SnippetString, Uri, window, workspace, WorkspaceConfiguration, WorkspaceEdit } from 'vscode';
+import {
+    commands, Disposable, languages, Position, Range, SnippetString, Uri, ViewColumn, window, workspace,
+    WorkspaceConfiguration, WorkspaceEdit
+} from 'vscode';
 import { Filesystem } from './utils/filesystem';
-import { disposeAll, fistLetterUpper, isOpenedInEditor, replaceAll } from './utils/utils';
-import * as fs from 'fs';
+import { disposeAll, fistLetterUpper, isOpenedInEditor, openFile, replaceAll } from './utils/utils';
 import { LinkProvider } from './output/linkProvider';
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+export enum FilePane {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    Current,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    Left,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    Right
+}
+
+interface FileMapping {
+    header: string[]
+    source: string[]
+    name: string
+}
 
 export class Cpphelper implements Disposable {
     private _dispose: Disposable[] = [];
+
 
     public constructor() {
         // regist command
@@ -13,6 +34,9 @@ export class Cpphelper implements Disposable {
         this._dispose.push(commands.registerCommand("cpphelper.createCppClass", (uri: Uri) => this.createClass(uri.fsPath)));
         this._dispose.push(commands.registerCommand('cpphelper.instertRegion', this.instertRegion));
         this._dispose.push(commands.registerCommand("cpphelper.createUnitTest", (uri: Uri) => this.createUnitTest(uri.fsPath)));
+        this._dispose.push(commands.registerCommand("cpphelper.switch", () => this.openCppFileInPane(FilePane.Current)));
+        this._dispose.push(commands.registerCommand("cpphelper.switchRightPane", () => this.openCppFileInPane(FilePane.Right)));
+        this._dispose.push(commands.registerCommand("cpphelper.switchLeftPane", () => this.openCppFileInPane(FilePane.Left)));
 
         // ouput log doc link
         let languagesIds: string[] = this.config().get<string[]>('linkFileLanguagesIds')!;
@@ -29,6 +53,31 @@ export class Cpphelper implements Disposable {
 
     public async dispose() {
         disposeAll(this._dispose);
+    }
+
+    public async openCppFileInPane(pane: FilePane) {
+        let fileName = await this.findCppFileNameMatchToCurrent();
+
+        let viewColumn: any = null;
+        let currentColumn = window.activeTextEditor!.viewColumn!;
+
+        if (currentColumn === null) {
+            currentColumn = ViewColumn.One;
+        }
+
+        switch (pane) {
+            case FilePane.Current:
+                viewColumn = currentColumn;
+                break;
+            case FilePane.Left:
+                viewColumn = currentColumn - 1;
+                break;
+            case FilePane.Right:
+                viewColumn = currentColumn + 1;
+                break;
+        }
+
+        openFile(fileName, viewColumn);
     }
 
     // create header guard of file
@@ -222,5 +271,132 @@ export class Cpphelper implements Disposable {
     private genUnitTestTemplate(fileName: string): string {
         let unitTestTemplate: string = this.config().get<string>('unitTestCreatorTemplate')!;
         return replaceAll(unitTestTemplate, '${fileName}', fistLetterUpper(fileName));
+    }
+
+    private async findCppFileNameMatchToCurrent() {
+        let activeTextEditor = window.activeTextEditor!;
+        let document = activeTextEditor.document;
+        let fileName = await this.findCppFileNameMatchedFileAsync(document.fileName);
+        return fileName;
+    }
+
+    private findCppFileNameMatchedFileAsync(currentFileName: string): Thenable<string> {
+        let dir = path.dirname(currentFileName);
+        let extension = path.extname(currentFileName);
+
+        // If there's no extension, then nothing to do
+        if (!extension) {
+            // @ts-ignore
+            return;
+        }
+
+        let fileWithoutExtension = path.basename(currentFileName).replace(extension, '');
+
+        // Determine if the file is a header or source file.
+        // @ts-ignore
+        let extensions: string[] = null;
+
+        let mappings = this.config().get<FileMapping[]>('headerSourceMappings')!;
+
+        for (let i = 0; i < mappings.length; i++) {
+            let mapping = mappings[i];
+
+            if (mapping.header.indexOf(extension) !== -1) {
+                extensions = mapping.source;
+            }
+            else if (mapping.source.indexOf(extension) !== -1) {
+                extensions = mapping.header;
+            }
+
+            if (extensions) {
+                console.log("Detected extension using map: " + mapping.name);
+                break;
+            }
+        }
+
+        if (!extensions) {
+            console.log("No matching extension found");
+            // @ts-ignore
+            return;
+        }
+
+        let extRegex = "(\\" + extensions.join("|\\") + ")$";
+        let newFileName = fileWithoutExtension;
+        let found: boolean = false;
+
+        // Search the current directory for a matching file
+        let filesInDir: string[] = fs.readdirSync(dir).filter((value: string, _index: number, _array: string[]) => {
+            return (path.extname(value).match(extRegex) !== undefined);
+        });
+
+        for (var i = 0; i < filesInDir.length; i++) {
+            let fileName: string = filesInDir[i];
+            let match = fileName.match(fileWithoutExtension + extRegex);
+            if (match) {
+                found = true;
+                newFileName = match[0];
+                break;
+            }
+        }
+
+        if (found) {
+            let newFile = path.join(dir, newFileName);
+            return new Promise<string>((resolve, _reject) => {
+                resolve(newFile);
+            });
+        }
+        else {
+            return new Promise<string>((resolve, reject) => {
+                let promises = new Array<Promise<Uri[]>>();
+                extensions.forEach(ext => {
+                    promises.push(new Promise<Uri[]>(
+                        (resolve, _reject) => {
+                            workspace.findFiles('**/' + fileWithoutExtension + ext).then(
+                                (uris) => {
+                                    resolve(uris);
+                                }
+                            );
+                        }));
+                });
+
+                Promise.all(promises).then(
+                    (values: any[]) => {
+                        if (values.length === 0) {
+                            // @ts-ignore
+                            resolve(null);
+                            return;
+                        }
+
+                        values = values.filter((value: any) => {
+                            return value && value.length > 0;
+                        });
+
+                        // flatten the values to a single array
+                        let filePaths: any = [].concat.apply([], values);
+                        filePaths = filePaths.map((uri: Uri, _index: number) => {
+                            return path.normalize(uri.fsPath);
+                        });
+
+                        // Try to order the filepaths based on closeness to original file
+                        filePaths.sort((a: string, b: string) => {
+                            let aRelative = path.relative(currentFileName, a);
+                            let bRelative = path.relative(currentFileName, b);
+
+                            let aDistance = aRelative.split(path.sep).length;
+                            let bDistance = bRelative.split(path.sep).length;
+
+                            return aDistance - bDistance;
+                        });
+
+                        if (filePaths && filePaths.length > 0) {
+                            resolve(filePaths[0]);
+                        }
+                        else {
+                            reject('no paths matching');
+                        }
+                    }
+                );
+            });
+        }
     }
 }
