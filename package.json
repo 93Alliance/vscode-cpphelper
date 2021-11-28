@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -143,6 +143,42 @@
 							"name": "C++"
 						}
 					]
+				},
+				"cpphelper.compileCommandsStrip": {
+					"type": "object",
+					"default": {
+						"enable": false,
+						"dir": "${workspaceFolder}/build",
+						"outputDir": "${workspaceFolder}",
+						"windows": [
+							{
+								"match": "^C:\\\\.*cl.exe",
+								"replace": "/usr/bin/clang++"
+							},
+							{
+								"match": "-Zc:__cplusplus",
+								"replace": ""
+							},
+							{
+								"match": "-permissive-",
+								"replace": ""
+							},
+							{
+								"match": "-std:c\\+\\+latest",
+								"replace": "-std=c++20"
+							},
+							{
+								"match": "-wd5105",
+								"replace": ""
+							},
+							{
+								"match": "-MDd",
+								"replace": ""
+							}
+						],
+						"linux": []
+					},
+					"description": "Strip compile_commands.json database file."
 				}
 			}
 		},
@@ -172,9 +208,9 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run package",
-		"compile": "webpack",
-		"watch": "webpack --watch",
-		"package": "webpack --mode production --devtool hidden-source-map",
+		"compile": "node node_modules/webpack/bin/webpack",
+		"watch": "node node_modules/webpack/bin/webpack --watch",
+		"package": "node node_modules/webpack/bin/webpack --mode production --devtool hidden-source-map",
 		"test-compile": "tsc -p ./",
 		"test-watch": "tsc -watch -p ./",
 		"pretest": "npm run test-compile && npm run lint",

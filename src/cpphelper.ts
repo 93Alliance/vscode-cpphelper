@@ -8,6 +8,7 @@ import { LinkProvider } from './output/linkProvider';
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 export enum FilePane {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -26,9 +27,13 @@ interface FileMapping {
 
 export class Cpphelper implements Disposable {
     private _dispose: Disposable[] = [];
-
+    private _srvCwd: string;
 
     public constructor() {
+        const wss = workspace.workspaceFolders;
+        if (!wss || wss.length === 0) { throw Error("No workspace opened"); }
+        this._srvCwd = wss[0].uri.fsPath;
+
         // regist command
         this._dispose.push(commands.registerCommand('cpphelper.createHeaderGuard', this.createHeaderGuard, this));
         this._dispose.push(commands.registerCommand("cpphelper.createCppClass", (uri: Uri) => this.createClass(uri.fsPath)));
@@ -49,10 +54,59 @@ export class Cpphelper implements Disposable {
         }));
 
         this.autoAmendHeaderGuard();
+        // strip compile command
+        const compileCmdConfig: any = this.config().get("compileCommandsStrip");
+        if (compileCmdConfig.enable) {
+            var re = /\${workspaceFolder}/gi;
+            const srcDbPath = compileCmdConfig.dir.replace(re, this._srvCwd) + "/compile_commands.json";
+            const dstDbPath = compileCmdConfig.outputDir.replace(re, this._srvCwd) + "/compile_commands.json";
+            // const dbPath = compileCmdConfig
+            const dbWatcher = workspace.createFileSystemWatcher(srcDbPath, false, false, true);
+            this._dispose.push(dbWatcher.onDidChange(_e => { // amend
+                this.stripCompileCommands(srcDbPath, dstDbPath);
+            }));
+            this._dispose.push(dbWatcher.onDidCreate(_e => { // create
+                this.stripCompileCommands(srcDbPath, dstDbPath);
+            }));
+        }
     }
 
     public async dispose() {
         disposeAll(this._dispose);
+    }
+
+    public async stripCompileCommands(srcPath: string, dstPath: string) {
+        try {
+            const data = fs.readFileSync(srcPath, 'utf8').toString();
+            if (data === "" || data === "\n") {
+                return;
+            }
+            // read config
+            const dbConfig: any = this.config().get("compileCommandsStrip");
+            let conf: any;
+            if (os.platform() === "win32") {
+                conf = dbConfig.windows;
+            } else if (os.platform() === "linux") {
+                conf = dbConfig.linux;
+            } else {
+                console.log("not supported platform ", os.platform());
+                return;
+            }
+
+            let compileCommands = JSON.parse(data);
+            for (let i = 0; i < compileCommands.length; i++) {
+                let element = compileCommands[i];
+                for (let j = 0; j < conf.length; j++) {
+                    let tc = conf[j];
+                    const re = new RegExp(tc.match);
+                    element.command = element.command.replace(re, tc.replace);
+                }
+            }
+            let result = JSON.stringify(compileCommands);
+            fs.writeFileSync(dstPath, result);
+        } catch (error) {
+            console.log(error);
+        }
     }
 
     public async openCppFileInPane(pane: FilePane) {
