@@ -1,5 +1,6 @@
+import { ClangdApi } from './lsp/clangd';
 import {
-    commands, Disposable, languages, Position, Range, SnippetString, Uri, ViewColumn, window, workspace,
+    commands, Disposable, languages, Position, Range, SnippetString, TextDocument, TextEditor, Uri, ViewColumn, window, workspace,
     WorkspaceConfiguration, WorkspaceEdit
 } from 'vscode';
 import { Filesystem } from './utils/filesystem';
@@ -9,6 +10,7 @@ import { LinkProvider } from './output/linkProvider';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { extractSignature } from './lsp/funcSignature';
 
 export enum FilePane {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -29,7 +31,7 @@ export class Cpphelper implements Disposable {
     private _dispose: Disposable[] = [];
     private _srvCwd: string;
 
-    public constructor() {
+    public constructor(private _clangd: ClangdApi) {
         const wss = workspace.workspaceFolders;
         if (!wss || wss.length === 0) { throw Error("No workspace opened"); }
         this._srvCwd = wss[0].uri.fsPath;
@@ -42,6 +44,7 @@ export class Cpphelper implements Disposable {
         this._dispose.push(commands.registerCommand("cpphelper.switch", () => this.openCppFileInPane(FilePane.Current)));
         this._dispose.push(commands.registerCommand("cpphelper.switchRightPane", () => this.openCppFileInPane(FilePane.Right)));
         this._dispose.push(commands.registerCommand("cpphelper.switchLeftPane", () => this.openCppFileInPane(FilePane.Left)));
+        this._dispose.push(commands.registerCommand("cpphelper.createFuncImpl", () => this.createFuncImplement()));
 
         // ouput log doc link
         let languagesIds: string[] = this.config().get<string[]>('linkFileLanguagesIds')!;
@@ -69,10 +72,61 @@ export class Cpphelper implements Disposable {
                 this.stripCompileCommands(srcDbPath, dstDbPath);
             }));
         }
+        // TODO: 如何解决换系统时不能及时更改？多测试一下。目前是手动删除build下和根目录下的command文件
     }
 
     public async dispose() {
         disposeAll(this._dispose);
+    }
+
+    // create function implement
+    public async createFuncImplement() {
+        const item: any = await this._clangd.ast();
+        if (!item) { return; }
+        const funcSignature = extractSignature(item);
+        const editor = window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+        const uri = editor.document.uri;
+        let extName = path.extname(uri.path);
+        const fileName = path.basename(uri.path, extName);
+        const dirName = path.dirname(uri.path);
+        let sourceExtName = "";
+        if (extName === ".hpp") {
+            sourceExtName = ".cpp";
+        } else if (extName === ".h") {
+            sourceExtName = ".c";
+        } else {
+            return;
+        }
+        const sourceFile = dirName + "/" + fileName + sourceExtName;
+        let workspaceEdit = new WorkspaceEdit();
+        workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
+        workspace.applyEdit(workspaceEdit).then((result: boolean) => {
+            if (result) {
+                return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
+                    window.showTextDocument(doc, 1, true).then((textEditor: TextEditor) => {
+                        textEditor.insertSnippet(new SnippetString("#include \"" + fileName + extName + "\"\n"))
+                            .then(() => {
+                                textEditor.insertSnippet(
+                                    new SnippetString(funcSignature), textEditor.document.positionAt(textEditor.document.getText().length));
+                            });
+                    });
+                });
+            } else {
+                if (window.activeTextEditor) {
+                    return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
+                        window.showTextDocument(doc).then((textEditor: TextEditor) => {
+                            textEditor.insertSnippet(
+                                new SnippetString(funcSignature), textEditor.document.positionAt(textEditor.document.getText().length));
+                        });
+                    });
+                }
+            }
+            return;
+        }); 
+
     }
 
     public async stripCompileCommands(srcPath: string, dstPath: string) {
