@@ -12,6 +12,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const si = setInterval(() => {
                 if (clangd.isActive) {
                     clangApi.ast = clangd.exports.ast;
+                    clangApi.hover = clangd.exports.hover;
                     clearInterval(si);
                 }
             }, 1500);

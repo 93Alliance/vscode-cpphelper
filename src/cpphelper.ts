@@ -81,9 +81,13 @@ export class Cpphelper implements Disposable {
 
     // create function implement
     public async createFuncImplement() {
-        const item: any = await this._clangd.ast();
+        const item: any = await this._clangd.hover();
         if (!item) { return; }
-        const funcSignature = extractSignature(item);
+        if (!item.contents || item.contents.value === '') {
+            return;
+        }
+
+        const funcSignature = extractSignature(item.contents.value);
         const editor = window.activeTextEditor;
         if (!editor) {
             return;

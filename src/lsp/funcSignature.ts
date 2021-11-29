@@ -28,7 +28,7 @@ export function extractSignature(res: string): string {
     const values: string[] = res.split("\n");
     const value = values[0];
     const cppRange = extractCppRange(res);
-    result.funcName = value.substring(value.indexOf("`") + 1, value.length - 1);
+    result.funcName = value.substring(value.indexOf("`") + 1, value.length - 3);
     if (hasKey(value, "constructor")) {
         result.kind = 'Constructor';
         result.className = extractClassName(cppRange);
@@ -63,19 +63,19 @@ function sig2str(fg: FuncSignature): string {
     let result = '';
     switch (fg.kind) {
         case 'Constructor':
-            result = fg.className + "::" + fg.funcMain + funcExt;
+            result = "\n" + fg.className + "::" + fg.funcMain + funcExt;
             break;
         case 'Destructor':
-            result = fg.className + "::~" + fg.className + "()" + funcExt;
+            result = "\n" + fg.className + "::~" + fg.className + "()" + funcExt;
             break;
         case 'StaticMember':
-            result = fg.rtnType + " " + fg.className + "::" + fg.funcMain + funcExt;
+            result = "\n" + fg.rtnType + " " + fg.className + "::" + fg.funcMain + funcExt;
             break;
         case 'NormalMember':
-            result = fg.rtnType + " " + fg.className + "::" + fg.funcMain + funcExt;
+            result = "\n" + fg.rtnType + " " + fg.className + "::" + fg.funcMain + funcExt;
             break;
         case 'NormalFunc':
-            result = fg.funcMain + funcExt;
+            result = "\n" + fg.funcMain + funcExt;
             break;
         default:
             break;
