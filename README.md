@@ -21,10 +21,15 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
+### 0.0.8
+- fix: create global function implement without namespace.
+
 ### 0.0.7
 - fix: failed to insert region
+
 ### 0.0.6
 - fix: not found insert region into the selected range command
+
 ### 0.0.5
 ### 0.0.4
 ### 0.0.3

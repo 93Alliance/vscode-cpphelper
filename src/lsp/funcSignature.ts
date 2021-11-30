@@ -1,5 +1,3 @@
-import { replaceAll } from "../utils/utils";
-
 function hasKey(str: string, key: string): boolean {
     return str.indexOf(key) !== -1;
 }
@@ -13,6 +11,7 @@ interface FuncSignature {
     rtnType: string;
     funcName: string;
     className: string;
+    namespace: string;
     funcMain: string; // function name + parameter
 }
 
@@ -22,7 +21,8 @@ export function extractSignature(res: string): string {
         rtnType: "",
         funcName: "",
         className: "",
-        funcMain: ""
+        funcMain: "",
+        namespace: ""
     };
 
     const values: string[] = res.split("\n");
@@ -36,12 +36,12 @@ export function extractSignature(res: string): string {
     } else if (hasKey(value, "static-method")) {
         result.kind = 'StaticMember';
         result.className = extractClassName(cppRange);
-        result.rtnType = extractMemberRtnType(cppRange, result.funcName);
+        result.rtnType = extractRtnType(cppRange, result.funcName);
         result.funcMain = extractFuncMain(cppRange, result.funcName);
     } else if (hasKey(value, "instance-method")) {
         result.kind = 'NormalMember';
         result.className = extractClassName(cppRange);
-        result.rtnType = extractMemberRtnType(cppRange, result.funcName);
+        result.rtnType = extractRtnType(cppRange, result.funcName);
         result.funcMain = extractFuncMain(cppRange, result.funcName);
     } else if (hasKey(value, "class")) {
         result.kind = 'Destructor';
@@ -49,8 +49,9 @@ export function extractSignature(res: string): string {
         result.rtnType = "void";
     } else if (hasKey(value, "function")) {
         result.kind = 'NormalFunc';
-        result.funcMain = cppRange.substring(cppRange.indexOf("\n") + 1);
-        result.funcMain = replaceAll(result.funcMain, "static ", "");
+        result.namespace = extractNormalFuncNamespace(cppRange);
+        result.rtnType = extractRtnType(cppRange, result.funcName);
+        result.funcMain = extractFuncMain(cppRange, result.funcName);
     } else {
         console.log("not supported ", value);
         return "";
@@ -75,7 +76,7 @@ function sig2str(fg: FuncSignature): string {
             result = "\n" + fg.rtnType + " " + fg.className + "::" + fg.funcMain + funcExt;
             break;
         case 'NormalFunc':
-            result = "\n" + fg.funcMain + funcExt;
+            result = "\n" + fg.rtnType + " " + fg.namespace + "::" + fg.funcMain + funcExt;
             break;
         default:
             break;
@@ -93,12 +94,19 @@ function extractCppRange(res: string): string {
 
 // // In SignalTower => SignalTower
 function extractClassName(cppRange: string): string {
-    return cppRange.substring(cppRange.indexOf("// In") + 6, cppRange.indexOf("\n"));
+    const key = "// In";
+    return cppRange.substring(cppRange.indexOf(key) + key.length + 1, cppRange.indexOf("\n"));
+}
+
+// // In namespace jet::handler => jet::handler
+function extractNormalFuncNamespace(cppRange: string) {
+    const key = "// In namespace";
+    return cppRange.substring(cppRange.indexOf(key) + key.length + 1, cppRange.indexOf("\n"));
 }
 
 // public: static void appendResponseFunc(int responseFunc)
 // => void
-function extractMemberRtnType(cppRange: string, funcName: string): string {
+function extractRtnType(cppRange: string, funcName: string): string {
     let result = '';
     if (hasKey(cppRange, "static")) {
         result = cppRange.substring(cppRange.indexOf("static") + 7, cppRange.indexOf(funcName + "(") - 1);
@@ -108,6 +116,10 @@ function extractMemberRtnType(cppRange: string, funcName: string): string {
         result = cppRange.substring(cppRange.indexOf("public:") + 8, cppRange.indexOf(funcName + "(") - 1);
     } else if (hasKey(cppRange, "private:")) {
         result = cppRange.substring(cppRange.indexOf("private:") + 9, cppRange.indexOf(funcName + "(") - 1);
+    } else if (hasKey(cppRange, "template<")) {
+        result = '';
+    } else { // global normal function
+        result = cppRange.substring(cppRange.indexOf("\n") + 1, cppRange.indexOf(funcName + "(") - 1);
     }
     return result;
 }
