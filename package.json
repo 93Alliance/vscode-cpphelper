@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -62,19 +62,28 @@
 			},
 			{
 				"command": "cpphelper.switch",
+				"category": "cpphelper",
 				"title": "Switch Header/Source"
 			},
 			{
 				"command": "cpphelper.switchRightPane",
+				"category": "cpphelper",
 				"title": "Switch Header/Source To Right Pane"
 			},
 			{
 				"command": "cpphelper.switchLeftPane",
+				"category": "cpphelper",
 				"title": "Switch Header/Source To Left Pane"
 			},
 			{
 				"command": "cpphelper.createFuncImpl",
+				"category": "cpphelper",
 				"title": "Create function implement"
+			},
+			{
+				"command": "cpphelper.insertRegion",
+				"category": "cpphelper",
+				"title": "Insert region into the selected range"
 			}
 		],
 		"configuration": {

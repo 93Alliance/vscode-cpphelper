@@ -21,6 +21,8 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
+### 0.0.6
+- fix: not found insert region into the selected range command
 ### 0.0.5
 ### 0.0.4
 ### 0.0.3

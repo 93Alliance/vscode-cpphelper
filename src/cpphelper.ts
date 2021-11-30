@@ -39,7 +39,7 @@ export class Cpphelper implements Disposable {
         // regist command
         this._dispose.push(commands.registerCommand('cpphelper.createHeaderGuard', this.createHeaderGuard, this));
         this._dispose.push(commands.registerCommand("cpphelper.createCppClass", (uri: Uri) => this.createClass(uri.fsPath)));
-        this._dispose.push(commands.registerCommand('cpphelper.instertRegion', this.instertRegion));
+        this._dispose.push(commands.registerCommand('cpphelper.insertRegion', this.insertRegion));
         this._dispose.push(commands.registerCommand("cpphelper.createUnitTest", (uri: Uri) => this.createUnitTest(uri.fsPath)));
         this._dispose.push(commands.registerCommand("cpphelper.switch", () => this.openCppFileInPane(FilePane.Current)));
         this._dispose.push(commands.registerCommand("cpphelper.switchRightPane", () => this.openCppFileInPane(FilePane.Right)));
@@ -285,7 +285,7 @@ export class Cpphelper implements Disposable {
     }
 
     // insert region to selection
-    public async instertRegion() {
+    public async insertRegion() {
         try {
             const editor = window.activeTextEditor;
             if (editor === undefined) {
