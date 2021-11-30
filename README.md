@@ -4,20 +4,16 @@
 
 ## Features
 
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- Switch header source: `cpphelper.switch`
+- Switch header source to right pane: `cpphelper.switchRightPane`
+- Switch header source to left pane: `cpphelper.switchLeftPane`
+- Create header guard to file: `cpphelper.createHeaderGuard`
+- Auto amend header guard when file was amend.
+- Auto create header guard when file was created.
+- Generate cpp classs file.
+- Generate unit file.
 
 ## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
 
 ## Known Issues
 
@@ -25,9 +21,11 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
+### 0.0.5
+### 0.0.4
+### 0.0.3
+### 0.0.2
+### 0.0.1
 
 ----------------------------------------------------------------------------------------------------------
 
