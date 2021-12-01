@@ -21,6 +21,11 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
+### 0.0.9
+- add: cmakeBuildOutputDoclinkEnable setting
+- add: cmakeBuildOutputFormatEnable setting
+- fix: function implement support protected function
+
 ### 0.0.8
 - fix: create global function implement without namespace.
 

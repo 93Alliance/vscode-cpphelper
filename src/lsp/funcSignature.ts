@@ -1,6 +1,4 @@
-function hasKey(str: string, key: string): boolean {
-    return str.indexOf(key) !== -1;
-}
+import { hasKey } from "../utils/utils";
 
 const funcExt = "\n{\n}\n";
 
@@ -116,7 +114,9 @@ function extractRtnType(cppRange: string, funcName: string): string {
         result = cppRange.substring(cppRange.indexOf("public:") + 8, cppRange.indexOf(funcName + "(") - 1);
     } else if (hasKey(cppRange, "private:")) {
         result = cppRange.substring(cppRange.indexOf("private:") + 9, cppRange.indexOf(funcName + "(") - 1);
-    } else if (hasKey(cppRange, "template<")) {
+    } else if (hasKey(cppRange, "protected:")) {
+        result = cppRange.substring(cppRange.indexOf("protected:") + 11, cppRange.indexOf(funcName + "(") - 1);
+    }else if (hasKey(cppRange, "template<")) {
         result = '';
     } else { // global normal function
         result = cppRange.substring(cppRange.indexOf("\n") + 1, cppRange.indexOf(funcName + "(") - 1);

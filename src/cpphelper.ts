@@ -1,3 +1,4 @@
+import { CompilerOutputer } from './output/compilerOutputer';
 import { ClangdApi } from './lsp/clangd';
 import {
     commands, Disposable, languages, Position, Range, SnippetString, TextDocument, TextEditor, Uri, ViewColumn, window, workspace,
@@ -5,7 +6,7 @@ import {
 } from 'vscode';
 import { Filesystem } from './utils/filesystem';
 import { disposeAll, fistLetterUpper, isOpenedInEditor, openFile, replaceAll } from './utils/utils';
-import { LinkProvider } from './output/linkProvider';
+import { CmakeLinkProvider } from './output/cmakeLinkProvider';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -47,14 +48,18 @@ export class Cpphelper implements Disposable {
         this._dispose.push(commands.registerCommand("cpphelper.createFuncImpl", () => this.createFuncImplement()));
 
         // ouput log doc link
-        let languagesIds: string[] = this.config().get<string[]>('linkFileLanguagesIds')!;
-        let linkProvider = new LinkProvider();
-        let outputLinkProvider = languages.registerDocumentLinkProvider(languagesIds, linkProvider);
-        this._dispose.push(workspace.onDidChangeConfiguration((_e) => {
-            outputLinkProvider.dispose();
-            languagesIds = this.config().get('linkFileLanguagesIds')!;
-            outputLinkProvider = languages.registerDocumentLinkProvider(languagesIds, linkProvider);
-        }));
+        const enableCmakeBuildDoclink = this.config().get<boolean>("cmakeBuildOutputDoclinkEnable")!;
+        if (enableCmakeBuildDoclink) {
+            let languagesIds: string[] = this.config().get<string[]>('linkFileLanguagesIds')!;
+            let linkProvider = new CmakeLinkProvider();
+            this._dispose.push(languages.registerDocumentLinkProvider(languagesIds, linkProvider));
+        }
+        const enableCmakeBuildFormat = this.config().get<boolean>("cmakeBuildOutputFormatEnable")!;
+        if (enableCmakeBuildFormat) {
+            let languagesIds: string[] = this.config().get<string[]>('linkFileLanguagesIds')!;
+            let linkProvider = new CompilerOutputer();
+            this._dispose.push(languages.registerDocumentLinkProvider(languagesIds, linkProvider));
+        }
 
         this.autoAmendHeaderGuard();
         // strip compile command
@@ -129,7 +134,7 @@ export class Cpphelper implements Disposable {
                 }
             }
             return;
-        }); 
+        });
 
     }
 

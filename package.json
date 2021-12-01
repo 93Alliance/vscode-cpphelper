@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -97,6 +97,11 @@
 						"end": "// #endregion"
 					}
 				},
+				"cpphelper.cmakeBuildOutputDoclinkEnable": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable cmake build output with document link."
+				},
 				"cpphelper.linkFileLanguagesIds": {
 					"type": "array",
 					"default": [
@@ -105,6 +110,11 @@
 					],
 					"description": "Set the languages ids to provide links for.",
 					"scope": "resource"
+				},
+				"cpphelper.cmakeBuildOutputFormatEnable": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable cmake build output format in BCO channel."
 				},
 				"cpphelper.headerGuardPattern": {
 					"type": "string",

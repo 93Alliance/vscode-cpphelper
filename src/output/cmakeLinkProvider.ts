@@ -1,65 +1,52 @@
-import { Filesystem } from './../utils/filesystem';
-import * as path from 'path';
 import {
     CancellationToken, DocumentLink, DocumentLinkProvider, Position, Range, TextDocument, Uri, workspace
 } from "vscode";
+import * as path from 'path';
+import { Filesystem } from "../utils/filesystem";
+import { ILineColumnInfo } from "./lineParse";
 
-interface IConfiguration {
-    eol: string;
-}
 
-export interface ILineColumnInfo {
-    lineNumber: number;
-    columnNumber: number;
-}
-
-export class LinkProvider implements DocumentLinkProvider {
+export class CmakeLinkProvider implements DocumentLinkProvider {
     // @ts-ignore
-    private processCwd: string;
+    private eol: string;
     private localLinkPattern: RegExp;
-    private configuration: IConfiguration;
     private startHeader = "[build] ";
+    private processCwd: string;
 
     constructor() {
-        this.configuration = {
-            eol: workspace.getConfiguration('files', null).get('eol')!,
-        };
-        this.localLinkPattern =
-            process.platform === 'win32' ?
-                new RegExp("^\\[build\\]\\s.*?\\(\\d+\\)") :
-                new RegExp("^\\[build\\]\\s.*?:(\\d+):(\\d+)");
-
+        this.eol = workspace.getConfiguration('files', null).get('eol')!;
+        this.localLinkPattern = process.platform === 'win32' ?
+            new RegExp("^\\[build\\]\\s.*?\\(\\d+\\)") :
+            new RegExp("^\\[build\\]\\s.*?:(\\d+):(\\d+)");
         const wss = workspace.workspaceFolders;
         if (!wss || wss.length === 0) { throw Error("No workspace opened"); }
         this.processCwd = wss[0].uri.fsPath;
     }
 
-    public async provideDocumentLinks(document: TextDocument, _token: CancellationToken): Promise<DocumentLink[]> {
+    public async provideDocumentLinks(doc: TextDocument, _token: CancellationToken): Promise<DocumentLink[]> {
         let results: DocumentLink[] = [];
-        // @ts-ignore
-        let lines = document.getText().split(this.configuration.eol);
+        if (doc.fileName.indexOf('extension-output-ms-vscode.cmake-tools') !== -1) {
+            // @ts-ignore
+            let lines = doc.getText().split(this.eol);
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
 
-            let result = await this.getLinksOnLine(line, i);
-
-            if (result.length > 0) {
-                results.push(...result);
+                let result = await this.getLinksOnLine(line, i);
+                if (result.length > 0) {
+                    results.push(...result);
+                }
             }
         }
 
         return Promise.resolve(results);
     }
 
-    public async getLinksOnLine(line: string, lineNumber: number) {
+    public async getLinksOnLine(line: string, lineNumber: number): Promise<DocumentLink[]> {
         const results: DocumentLink[] = [];
-        if (line === "") {
-            return results;
-        }
 
         if (!line.startsWith(this.startHeader)) {
-            return results;
+            return Promise.resolve(results);
         }
 
         // linux ^\[build\]\s.*?:(\d+):(\d+)
@@ -70,7 +57,7 @@ export class LinkProvider implements DocumentLinkProvider {
         // [build] D:\code\framework\src\kit\src\Archive/Json/Json.hpp(233):
         let pathWithHeader = line.match(this.localLinkPattern);
         if (pathWithHeader === null || pathWithHeader.length === 0) {
-            return results;
+            return Promise.resolve(results);
         }
         // 去除header
         // ../../../src/kit/test/Auxiliary/test_stringformat.cpp:14:5
@@ -104,11 +91,11 @@ export class LinkProvider implements DocumentLinkProvider {
         pathLink = path.normalize(pathLink);
 
         if (!(await Filesystem.exists(pathLink))) {
-            return results;
+            return Promise.resolve(results);
         }
 
         if (!(await Filesystem.isFile(pathLink))) {
-            return results;
+            return Promise.resolve(results);
         }
 
         let fileUri = Uri.file(pathLink);
@@ -118,15 +105,10 @@ export class LinkProvider implements DocumentLinkProvider {
         // @ts-ignore
         // 8的含义是从1开始数 startHeader 的长度。
         results.push(new DocumentLink(new Range(new Position(lineNumber, 8), new Position(lineNumber, end)), linkTarget));
-        return results;
+        return Promise.resolve(results);
     }
 
-    /**
-     * Returns line and column number of URl if that is present.
-     *
-     * @param link Url link which may contain line and column number.
-     */
-    public extractLineColumnInfo(link: string): ILineColumnInfo {
+    private extractLineColumnInfo(link: string): ILineColumnInfo {
         const lineColumnInfo: ILineColumnInfo = {
             lineNumber: 1,
             columnNumber: 1,
