@@ -29,7 +29,7 @@ export class CompilerOutputer implements DocumentLinkProvider, Disposable {
     private processCwd: string;
 
     constructor() {
-        this.channel = vscode.window.createOutputChannel('BCO');
+        this.channel = vscode.window.createOutputChannel('Key Issues');
         this._dispose.push(this.channel);
         this._eol = workspace.getConfiguration('files', null).get('eol')!;
         this.localLinkPattern = process.platform === 'win32' ?

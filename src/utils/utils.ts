@@ -12,15 +12,12 @@ export function isOpenedInEditor(file: Uri): boolean {
 }
 
 export async function openFile(fileName: string, column: ViewColumn, preserveFocus: boolean = false) {
-    console.log("Opening " + fileName + " in " + column + " pane");
-
     let uriFile = Uri.file(fileName);
 
     try {
         let document = await workspace.openTextDocument(uriFile);
 
         await window.showTextDocument(document, column, preserveFocus);
-        console.log("Done opening " + document.fileName);
     }
     catch (error) {
         console.error(error);
