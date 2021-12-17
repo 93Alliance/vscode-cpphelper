@@ -21,6 +21,14 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
+### 0.1.1
+- fix: when compileCommandsStrip is empty, strip compile commands is not executed.
+- fix: the created file is not open, header guard function is invalid.
+- fix: the renamed file is not open, header guard function is invalid. 
+
+### 0.1.0
+- amd: convert channel name to Key Issuses
+
 ### 0.0.9
 - add: cmakeBuildOutputDoclinkEnable setting
 - add: cmakeBuildOutputFormatEnable setting

@@ -5,7 +5,7 @@ import {
     WorkspaceConfiguration, WorkspaceEdit
 } from 'vscode';
 import { Filesystem } from './utils/filesystem';
-import { disposeAll, fistLetterUpper, isOpenedInEditor, openFile, replaceAll } from './utils/utils';
+import { disposeAll, fistLetterUpper, openFile, replaceAll } from './utils/utils';
 import { CmakeLinkProvider } from './output/cmakeLinkProvider';
 
 import * as fs from 'fs';
@@ -140,10 +140,6 @@ export class Cpphelper implements Disposable {
 
     public async stripCompileCommands(srcPath: string, dstPath: string) {
         try {
-            const data = fs.readFileSync(srcPath, 'utf8').toString();
-            if (data === "" || data === "\n") {
-                return;
-            }
             // read config
             const dbConfig: any = this.config().get("compileCommandsStrip");
             let conf: any;
@@ -153,6 +149,14 @@ export class Cpphelper implements Disposable {
                 conf = dbConfig.linux;
             } else {
                 console.log("not supported platform ", os.platform());
+                return;
+            }
+            if (conf.length === 0) {
+                return;
+            }
+
+            const data = fs.readFileSync(srcPath, 'utf8').toString();
+            if (data === "" || data === "\n") {
                 return;
             }
 
@@ -198,20 +202,17 @@ export class Cpphelper implements Disposable {
     }
 
     // create header guard of file
-    public async createHeaderGuard() {
-        if (window.activeTextEditor && window.activeTextEditor.selection) {
-            let fileName = window.activeTextEditor?.document.fileName;
-            const headerGuard = this.genHeaderGuard(fileName);
-            if (window.activeTextEditor) {
-                window.activeTextEditor.insertSnippet(
-                    new SnippetString('\n#endif // ' + headerGuard),
-                    window.activeTextEditor.document.positionAt(window.activeTextEditor.document.getText().length)
-                );
-                window.activeTextEditor.insertSnippet(
-                    new SnippetString('#ifndef ' + headerGuard + '\n#define ' + headerGuard + '\n\n'),
-                    window.activeTextEditor.document.positionAt(0)
-                );
-            }
+    public async createHeaderGuard(fileName: string) {
+        const headerGuard = this.genHeaderGuard(fileName);
+        if (window.activeTextEditor) {
+            window.activeTextEditor.insertSnippet(
+                new SnippetString('\n#endif // ' + headerGuard),
+                window.activeTextEditor.document.positionAt(window.activeTextEditor.document.getText().length)
+            );
+            window.activeTextEditor.insertSnippet(
+                new SnippetString('#ifndef ' + headerGuard + '\n#define ' + headerGuard + '\n\n'),
+                window.activeTextEditor.document.positionAt(0)
+            );
         }
     }
 
@@ -320,7 +321,9 @@ export class Cpphelper implements Disposable {
                 for (const newFile of event.files) {
                     if (Filesystem.isHeader(newFile.fsPath)) {
                         workspace.openTextDocument(newFile).then(doc =>
-                            window.showTextDocument(doc).then(this.createHeaderGuard)
+                            window.showTextDocument(doc, 1, true).then((editor) => {
+                                return this.createHeaderGuard(editor.document.fileName);
+                            })
                         );
                     }
                 }
@@ -330,36 +333,37 @@ export class Cpphelper implements Disposable {
         // rename
         this._dispose.push(workspace.onDidRenameFiles(event => {
             for (const renamedFile of event.files) {
-                if (Filesystem.isHeader(renamedFile.newUri.fsPath) && isOpenedInEditor(renamedFile.newUri)) {
-                    workspace.openTextDocument(renamedFile.newUri).then(_doc => {
-                        const editor = window.activeTextEditor;
-                        if (editor === undefined) {
-                            return;
-                        }
-                        const linesToRemove = Filesystem.findHeaderGuardLines();
-                        if (linesToRemove.length !== 0) {
-                            editor.edit((edit) => {
-                                let fileName = window.activeTextEditor?.document.fileName;
-                                if (fileName === undefined) {
-                                    return;
-                                }
-                                const headerGuard = this.genHeaderGuard(fileName);
-
-                                const directives = [
-                                    "#ifndef " + headerGuard + "\n",
-                                    "#define " + headerGuard + "\n",
-                                    "#endif" + " // " + headerGuard + "\n",
-                                ];
-                                for (let i = 0; i < 3; ++i) {
-                                    edit.replace(
-                                        new Range(new Position(linesToRemove[i], 0), new Position(linesToRemove[i] + 1, 0)),
-                                        directives[i]
-                                    );
-                                }
-                            });
-                        } else {
-                            this.createHeaderGuard();
-                        }
+                if (Filesystem.isHeader(renamedFile.newUri.fsPath)) {
+                    workspace.openTextDocument(renamedFile.newUri).then((doc) => {
+                        window.showTextDocument(doc, 1, true).then((editor) => {
+                            if (editor === undefined) {
+                                return;
+                            }
+                            const linesToRemove = Filesystem.findHeaderGuardLines();
+                            if (linesToRemove.length !== 0) {
+                                editor.edit((edit) => {
+                                    let fileName = window.activeTextEditor?.document.fileName;
+                                    if (fileName === undefined) {
+                                        return;
+                                    }
+                                    const headerGuard = this.genHeaderGuard(fileName);
+    
+                                    const directives = [
+                                        "#ifndef " + headerGuard + "\n",
+                                        "#define " + headerGuard + "\n",
+                                        "#endif" + " // " + headerGuard + "\n",
+                                    ];
+                                    for (let i = 0; i < 3; ++i) {
+                                        edit.replace(
+                                            new Range(new Position(linesToRemove[i], 0), new Position(linesToRemove[i] + 1, 0)),
+                                            directives[i]
+                                        );
+                                    }
+                                });
+                            } else {
+                                this.createHeaderGuard(editor.document.fileName);
+                            }
+                        });
                     });
                 }
             }
