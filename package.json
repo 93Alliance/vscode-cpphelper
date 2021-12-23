@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -84,6 +84,11 @@
 				"command": "cpphelper.insertRegion",
 				"category": "cpphelper",
 				"title": "Insert region into the selected range"
+			},
+			{
+				"command": "cpphelper.createGetterSetter",
+				"category": "cpphelper",
+				"title": "Create getter and setter function"
 			}
 		],
 		"configuration": {
@@ -202,6 +207,11 @@
 						"linux": []
 					},
 					"description": "Strip compile_commands.json database file."
+				},
+				"cpphelper.getterSetterExtBuiltinTypes": {
+					"type": "array",
+					"default": [],
+					"description": "Added builtin type"
 				}
 			}
 		},

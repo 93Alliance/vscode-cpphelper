@@ -13,7 +13,7 @@ interface FuncSignature {
     funcMain: string; // function name + parameter
 }
 
-export function extractSignature(res: string): string {
+export function extractFuncSignature(res: string): string {
     const result: FuncSignature = {
         kind: "NA",
         rtnType: "",

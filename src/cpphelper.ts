@@ -11,7 +11,8 @@ import { CmakeLinkProvider } from './output/cmakeLinkProvider';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { extractSignature } from './lsp/funcSignature';
+import { extractFuncSignature } from './lsp/funcSignature';
+import { GetterSetter } from './lsp/getterSetter';
 
 export enum FilePane {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -46,6 +47,7 @@ export class Cpphelper implements Disposable {
         this._dispose.push(commands.registerCommand("cpphelper.switchRightPane", () => this.openCppFileInPane(FilePane.Right)));
         this._dispose.push(commands.registerCommand("cpphelper.switchLeftPane", () => this.openCppFileInPane(FilePane.Left)));
         this._dispose.push(commands.registerCommand("cpphelper.createFuncImpl", () => this.createFuncImplement()));
+        this._dispose.push(commands.registerCommand("cpphelper.createGetterSetter", () => this.createGetterSetter()));
 
         // ouput log doc link
         const enableCmakeBuildDoclink = this.config().get<boolean>("cmakeBuildOutputDoclinkEnable")!;
@@ -92,7 +94,10 @@ export class Cpphelper implements Disposable {
             return;
         }
 
-        const funcSignature = extractSignature(item.contents.value);
+        const funcSignature = extractFuncSignature(item.contents.value);
+        if (funcSignature == "") {
+            return;
+        }
         const editor = window.activeTextEditor;
         if (!editor) {
             return;
@@ -101,14 +106,11 @@ export class Cpphelper implements Disposable {
         let extName = path.extname(uri.path);
         const fileName = path.basename(uri.path, extName);
         const dirName = path.dirname(uri.path);
-        let sourceExtName = "";
-        if (extName === ".hpp") {
-            sourceExtName = ".cpp";
-        } else if (extName === ".h") {
-            sourceExtName = ".c";
-        } else {
+        let sourceExtName = this.matchFileExtName(extName);
+        if (sourceExtName.length === 0) {
             return;
         }
+
         const sourceFile = dirName + "/" + fileName + sourceExtName;
         let workspaceEdit = new WorkspaceEdit();
         workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
@@ -136,6 +138,86 @@ export class Cpphelper implements Disposable {
             return;
         });
 
+    }
+
+    // create getter and setter for member Variable
+    public async createGetterSetter() {
+        const ast: any = await this._clangd.ast();
+        const hover: any = await this._clangd.hover();
+        if (!hover) { return; }
+        if (!hover.contents || hover.contents.value === '') {
+            return;
+        }
+
+        const extBuiltinTypes = this.config().get<string[]>("getterSetterExtBuiltinTypes")!;
+        const gs = new GetterSetter(hover.contents.value, ast, extBuiltinTypes);
+        window.showQuickPick(gs.getOptions()).then((value: any) => {
+            if (!value) {
+                return;
+            }
+
+            const funcs = gs.toFuncSig(value);
+            if (funcs.length === 0) {
+                return;
+            }
+
+            const editor = window.activeTextEditor;
+            if (!editor) {
+                return;
+            }
+            let selection = editor.selection;
+            let uri = editor.document.uri;
+            let editWs = new WorkspaceEdit();
+
+            let funcDeclarations = "";
+            for (const funcSig of funcs) {
+                funcDeclarations += "    " + funcSig.declaration;
+            }
+
+            editWs.insert(uri, new Position(selection.end.line + 1, 0), funcDeclarations);
+            workspace.applyEdit(editWs);
+
+            // header ext
+            let extName = path.extname(uri.path);
+            const fileName = path.basename(uri.path, extName);
+            const dirName = path.dirname(uri.path);
+            let sourceExtName = this.matchFileExtName(extName);
+            if (sourceExtName.length === 0) {
+                return;
+            }
+            const sourceFile = dirName + "/" + fileName + sourceExtName;
+            let workspaceEdit = new WorkspaceEdit();
+            workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
+            let funcDefinitions = "";
+            for (const funcSig of funcs) {
+                funcDefinitions += funcSig.definition;
+            }
+
+            // source
+            workspace.applyEdit(workspaceEdit).then((result: boolean) => {
+                if (result) {
+                    return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
+                        window.showTextDocument(doc, 1, true).then((textEditor: TextEditor) => {
+                            textEditor.insertSnippet(new SnippetString("#include \"" + fileName + extName + "\"\n"))
+                                .then(() => {
+                                    textEditor.insertSnippet(
+                                        new SnippetString("\n" + funcDefinitions), textEditor.document.positionAt(textEditor.document.getText().length));
+                                });
+                        });
+                    });
+                } else {
+                    if (window.activeTextEditor) {
+                        return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
+                            window.showTextDocument(doc).then((textEditor: TextEditor) => {
+                                textEditor.insertSnippet(
+                                    new SnippetString("\n" + funcDefinitions), textEditor.document.positionAt(textEditor.document.getText().length));
+                            });
+                        });
+                    }
+                }
+                return;
+            });
+        })
     }
 
     public async stripCompileCommands(srcPath: string, dstPath: string) {
@@ -347,7 +429,7 @@ export class Cpphelper implements Disposable {
                                         return;
                                     }
                                     const headerGuard = this.genHeaderGuard(fileName);
-    
+
                                     const directives = [
                                         "#ifndef " + headerGuard + "\n",
                                         "#define " + headerGuard + "\n",
@@ -518,6 +600,16 @@ export class Cpphelper implements Disposable {
                     }
                 );
             });
+        }
+    }
+
+    private matchFileExtName(extName: string): string {
+        if (extName === ".hpp") {
+            return ".cpp";
+        } else if (extName === ".h") {
+            return ".c";
+        } else {
+            return "";
         }
     }
 }
