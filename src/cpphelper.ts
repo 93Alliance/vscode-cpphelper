@@ -142,15 +142,27 @@ export class Cpphelper implements Disposable {
 
     // create getter and setter for member Variable
     public async createGetterSetter() {
+        const editor = window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+        if (!Filesystem.isHeader(editor.document.uri.fsPath)) {
+            return;
+        }
+
         const ast: any = await this._clangd.ast();
+        if (!ast || ast.kind != 'Field' || ast.role != 'declaration') { return; }
         const hover: any = await this._clangd.hover();
         if (!hover) { return; }
         if (!hover.contents || hover.contents.value === '') {
             return;
         }
+        const symbol: any = await this._clangd.documentSymbol();
+        if (!symbol) { return; }
 
-        const extBuiltinTypes = this.config().get<string[]>("getterSetterExtBuiltinTypes")!;
-        const gs = new GetterSetter(hover.contents.value, ast, extBuiltinTypes);
+        const gs = new GetterSetter(hover.contents.value, ast, symbol, editor);
+        const options = gs.getOptions();
+        if (options.length ===0 ) { return; }
         window.showQuickPick(gs.getOptions()).then((value: any) => {
             if (!value) {
                 return;
@@ -161,10 +173,6 @@ export class Cpphelper implements Disposable {
                 return;
             }
 
-            const editor = window.activeTextEditor;
-            if (!editor) {
-                return;
-            }
             let selection = editor.selection;
             let uri = editor.document.uri;
             let editWs = new WorkspaceEdit();

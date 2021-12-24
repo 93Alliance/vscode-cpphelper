@@ -1,3 +1,4 @@
+import { Range, TextEditor, workspace } from "vscode";
 import { fistLetterUpper, hasKey } from "../utils/utils";
 
 // ### field `m_defaultVal`  
@@ -31,12 +32,16 @@ export class GetterSetter {
     private readonly _ast;
     private readonly _extBuiltinTypes;
     private readonly _builtinTypes = ["std::size_t"];
+    private readonly _editor;
+    private classSymbol: any;
     private memberSig: MemberSignature;
 
-    constructor(hover: string, ast: any, extBuiltinTypes: string[]) {
+    constructor(hover: string, ast: any, symbol: any, editor: TextEditor) {
         this._hover = hover;
         this._ast = ast;
-        this._extBuiltinTypes = extBuiltinTypes;
+        this._editor = editor;
+        if (this._editor) {}; // TODO: remove
+        this._extBuiltinTypes = workspace.getConfiguration('cpphelper').get<string[]>("getterSetterExtBuiltinTypes")!;
         this.memberSig = {
             type: "",
             name: "",
@@ -44,6 +49,7 @@ export class GetterSetter {
             className: "",
             isBuiltin: false
         };
+        this.classSymbol = this.ownerClass(this.findClass(symbol), ast.range);
         this.extractMemberSignature(this._hover);
         this.checkBuiltin(this._ast);
     }
@@ -53,8 +59,20 @@ export class GetterSetter {
     }
 
     public getOptions(): string[] {
-        // TODO: add filter option by active document
-        return ['Getter & Setter', 'Getter', 'Setter'];
+        const opions: string[] = [];
+        const hasGetter = this.hasGetterDefinition();
+        const hasSetter = this.hasSetterDefinition();
+        if (!hasGetter) {
+            opions.push('Getter');
+        }
+        if (!hasSetter) {
+            opions.push('Setter');
+        }
+        if (!hasGetter && !hasSetter) {
+            opions.push('Getter & Setter');
+        }
+
+        return opions;
     }
 
     public toFuncSig(option: GetterSetterOption): GetterSetterSignature[] {
@@ -72,12 +90,12 @@ export class GetterSetter {
             };
             // definition
             if (this.memberSig.isBuiltin) {
-                func.definition = `${sig.type} ${sig.className}::get${fistLetterUpper(sig.name)}() const`;
+                func.definition = `${sig.type} ${sig.className}::${sig.name}() const`;
                 // declaration
-                func.declaration = `${sig.type} get${fistLetterUpper(sig.name)}() const;\n`;
+                func.declaration = `${sig.type} ${sig.name}() const;\n`;
             } else {
-                func.definition = `const ${sig.type}& ${sig.className}::get${fistLetterUpper(sig.name)}() const`;
-                func.declaration = `const ${sig.type}& get${fistLetterUpper(sig.name)}() const;\n`
+                func.definition = `const ${sig.type}& ${sig.className}::${sig.name}() const`;
+                func.declaration = `const ${sig.type}& ${sig.name}() const;\n`
             }
             // add implement
             func.definition += `\n{\n    return this->${sig.oriname};\n}\n`
@@ -166,6 +184,62 @@ export class GetterSetter {
                 return
             }
         }
+    }
+
+    private hasSetterDefinition(): boolean {
+        // 6 is method
+        for (const ele of this.classSymbol.children) {
+            const funcName = `set${fistLetterUpper(this.memberSig.name)}`;
+            if (ele.kind === 6 && ele.name === funcName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private hasGetterDefinition(): boolean {
+        for (const ele of this.classSymbol.children) {
+            const funcName = this.memberSig.name;
+            if (ele.kind === 6 && ele.name === funcName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // private getPublicRange() {
+    //     // class range
+    //     const range = this.classSymbol.range;
+    //     // class content
+    //     const content = this._editor.document.getText(range)
+    // }
+
+    private ownerClass(cs: any[], target: Range): any {
+        for (const c of cs) {
+            if (target.start.line >= c.range.start.line && target.end.line <= c.range.end.line) {
+                return c;
+            }
+        }
+    }
+
+    private findClass(arr: any): any[] {
+        const classSymbols: any[] = [];
+        for (const ele of arr) {
+            // 5 is class, 23 is struct
+            if (ele.kind === 5 || ele.kind === 23) {
+                classSymbols.push(ele);
+            } else {
+                if (ele.children && ele.children.length > 0) {
+                    const r = this.findClass(ele.children);
+                    if (r.length > 0) {
+                        for (const v of r) {
+                            classSymbols.push(v);
+                        }
+                    }
+                }
+            }
+        }
+        return classSymbols;
     }
 }
 

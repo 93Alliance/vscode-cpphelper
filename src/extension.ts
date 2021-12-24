@@ -13,6 +13,9 @@ function importClangdApi(clangd: vscode.Extension<any>, clangApi: ClangdApi) {
                 if (clangd.exports.hover) {
                     clangApi.hover = clangd.exports.hover;
                 }
+                if (clangd.exports.documentSymbol) {
+                    clangApi.documentSymbol = clangd.exports.documentSymbol;
+                }
                 clearInterval(si);
             }
         }, 1500);
