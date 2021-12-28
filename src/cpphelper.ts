@@ -241,9 +241,6 @@ export class Cpphelper implements Disposable {
                 console.log("not supported platform ", os.platform());
                 return;
             }
-            if (conf.length === 0) {
-                return;
-            }
 
             const data = fs.readFileSync(srcPath, 'utf8').toString();
             if (data === "" || data === "\n") {
