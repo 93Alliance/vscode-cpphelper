@@ -74,7 +74,8 @@ function sig2str(fg: FuncSignature): string {
             result = "\n" + fg.rtnType + " " + fg.className + "::" + fg.funcMain + funcExt;
             break;
         case 'NormalFunc':
-            result = "\n" + fg.rtnType + " " + fg.namespace + "::" + fg.funcMain + funcExt;
+            const namespaceStr = fg.namespace === "" ? "" : fg.namespace + "::";
+            result = "\n" + fg.rtnType + " " + namespaceStr + fg.funcMain + funcExt;
             break;
         default:
             break;
@@ -97,9 +98,13 @@ function extractClassName(cppRange: string): string {
 }
 
 // // In namespace jet::handler => jet::handler
-function extractNormalFuncNamespace(cppRange: string) {
+function extractNormalFuncNamespace(cppRange: string): string {
     const key = "// In namespace";
-    return cppRange.substring(cppRange.indexOf(key) + key.length + 1, cppRange.indexOf("\n"));
+    const s = cppRange.indexOf(key);
+    if (s === -1) {
+        return "";
+    }
+    return cppRange.substring(s + key.length + 1, cppRange.indexOf("\n"));
 }
 
 // public: static void appendResponseFunc(int responseFunc)
@@ -116,7 +121,7 @@ function extractRtnType(cppRange: string, funcName: string): string {
         result = cppRange.substring(cppRange.indexOf("private:") + 9, cppRange.indexOf(funcName + "(") - 1);
     } else if (hasKey(cppRange, "protected:")) {
         result = cppRange.substring(cppRange.indexOf("protected:") + 11, cppRange.indexOf(funcName + "(") - 1);
-    }else if (hasKey(cppRange, "template<")) {
+    } else if (hasKey(cppRange, "template<")) {
         result = '';
     } else { // global normal function
         result = cppRange.substring(cppRange.indexOf("\n") + 1, cppRange.indexOf(funcName + "(") - 1);
