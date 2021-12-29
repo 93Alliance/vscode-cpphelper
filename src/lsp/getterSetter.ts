@@ -1,5 +1,6 @@
 import { Range, TextEditor, workspace } from "vscode";
 import { fistLetterUpper, hasKey } from "../utils/utils";
+import { findClassFromSymbol, FunctionSignature } from "./common";
 
 // ### field `m_defaultVal`  
 // ---
@@ -20,11 +21,6 @@ export interface MemberSignature {
     oriname: string;
     className: string;
     isBuiltin: boolean;
-}
-
-export interface GetterSetterSignature {
-    declaration: string;
-    definition: string;
 }
 
 export class GetterSetter {
@@ -49,7 +45,7 @@ export class GetterSetter {
             className: "",
             isBuiltin: false
         };
-        this.classSymbol = this.ownerClass(this.findClass(symbol), ast.range);
+        this.classSymbol = this.ownerClass(findClassFromSymbol(symbol), ast.range);
         this.extractMemberSignature(this._hover);
         this.checkBuiltin(this._ast);
     }
@@ -75,16 +71,16 @@ export class GetterSetter {
         return opions;
     }
 
-    public toFuncSig(option: GetterSetterOption): GetterSetterSignature[] {
+    public toFuncSig(option: GetterSetterOption): FunctionSignature[] {
         // convert m_* to *, ex. m_name -> name
-        let funcs: GetterSetterSignature[] = [];
+        let funcs: FunctionSignature[] = [];
         let sig = this.memberSig;
         if (sig.name === '' || sig.type === '') {
             return funcs;
         }
 
         let genGetter = () => {
-            let func: GetterSetterSignature = {
+            let func: FunctionSignature = {
                 declaration: "",
                 definition: ""
             };
@@ -110,7 +106,7 @@ export class GetterSetter {
             } else {
                 param = `const ${sig.type}& ${paramName}`;
             }
-            let func: GetterSetterSignature = {
+            let func: FunctionSignature = {
                 declaration: "",
                 definition: ""
             };
@@ -220,26 +216,6 @@ export class GetterSetter {
                 return c;
             }
         }
-    }
-
-    private findClass(arr: any): any[] {
-        const classSymbols: any[] = [];
-        for (const ele of arr) {
-            // 5 is class, 23 is struct
-            if (ele.kind === 5 || ele.kind === 23) {
-                classSymbols.push(ele);
-            } else {
-                if (ele.children && ele.children.length > 0) {
-                    const r = this.findClass(ele.children);
-                    if (r.length > 0) {
-                        for (const v of r) {
-                            classSymbols.push(v);
-                        }
-                    }
-                }
-            }
-        }
-        return classSymbols;
     }
 }
 

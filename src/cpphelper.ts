@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { extractFuncSignature } from './lsp/funcSignature';
 import { GetterSetter } from './lsp/getterSetter';
+import { SpecialMember, SpecialMemberOptions } from './lsp/specialMember';
 
 export enum FilePane {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -48,6 +49,7 @@ export class Cpphelper implements Disposable {
         this._dispose.push(commands.registerCommand("cpphelper.switchLeftPane", () => this.openCppFileInPane(FilePane.Left)));
         this._dispose.push(commands.registerCommand("cpphelper.createFuncImpl", () => this.createFuncImplement()));
         this._dispose.push(commands.registerCommand("cpphelper.createGetterSetter", () => this.createGetterSetter()));
+        this._dispose.push(commands.registerCommand("cpphelper.createSpecialMember", () => this.createSpecialMember()));
 
         // ouput log doc link
         const enableCmakeBuildDoclink = this.config().get<boolean>("cmakeBuildOutputDoclinkEnable")!;
@@ -162,8 +164,8 @@ export class Cpphelper implements Disposable {
 
         const gs = new GetterSetter(hover.contents.value, ast, symbol, editor);
         const options = gs.getOptions();
-        if (options.length ===0 ) { return; }
-        window.showQuickPick(gs.getOptions()).then((value: any) => {
+        if (options.length === 0) { return; }
+        window.showQuickPick(gs.getOptions()).then(async (value: any) => {
             if (!value) {
                 return;
             }
@@ -183,7 +185,7 @@ export class Cpphelper implements Disposable {
             }
 
             editWs.insert(uri, new Position(selection.end.line + 1, 0), funcDeclarations);
-            workspace.applyEdit(editWs);
+            await workspace.applyEdit(editWs);
 
             // header ext
             let extName = path.extname(uri.path);
@@ -194,38 +196,91 @@ export class Cpphelper implements Disposable {
                 return;
             }
             const sourceFile = dirName + "/" + fileName + sourceExtName;
-            let workspaceEdit = new WorkspaceEdit();
-            workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
             let funcDefinitions = "";
             for (const funcSig of funcs) {
                 funcDefinitions += funcSig.definition;
             }
 
             // source
-            workspace.applyEdit(workspaceEdit).then((result: boolean) => {
-                if (result) {
-                    return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
-                        window.showTextDocument(doc, 1, true).then((textEditor: TextEditor) => {
-                            textEditor.insertSnippet(new SnippetString("#include \"" + fileName + extName + "\"\n"))
-                                .then(() => {
-                                    textEditor.insertSnippet(
-                                        new SnippetString("\n" + funcDefinitions), textEditor.document.positionAt(textEditor.document.getText().length));
-                                });
-                        });
-                    });
-                } else {
-                    if (window.activeTextEditor) {
-                        return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
-                            window.showTextDocument(doc).then((textEditor: TextEditor) => {
-                                textEditor.insertSnippet(
-                                    new SnippetString("\n" + funcDefinitions), textEditor.document.positionAt(textEditor.document.getText().length));
-                            });
-                        });
-                    }
-                }
-                return;
-            });
+            await this.insertSourceEnd(sourceFile, fileName, extName, funcDefinitions);
         })
+    }
+
+    // create class special member
+    public async createSpecialMember() {
+        const editor = window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+
+        // get cursor position
+        const cursor = editor.selection.end;
+        const symbol: any = await this._clangd.documentSymbol();
+        if (!symbol) { return; }
+
+        const sm = new SpecialMember(symbol, cursor);
+        if (!sm.isValid()) {
+            window.showWarningMessage("Not found valid class!");
+            return;
+        }
+        window.showQuickPick(SpecialMemberOptions, { canPickMany: true }).then(async (values: any) => {
+            if (!values || values.length === 0) {
+                return;
+            }
+            const funcs = sm.toFuncSig(values);
+            if (funcs.length === 0) {
+                return;
+            }
+
+            let uri = editor.document.uri;
+
+            let funcDeclarations = "";
+            for (const funcSig of funcs) {
+                funcDeclarations += "    " + funcSig.declaration;
+            }
+
+            let editWs = new WorkspaceEdit();
+            editWs.insert(uri, new Position(cursor.line + 1, 0), funcDeclarations);
+            await workspace.applyEdit(editWs);
+            // header ext
+            let extName = path.extname(uri.path);
+            const fileName = path.basename(uri.path, extName);
+            const dirName = path.dirname(uri.path);
+            let sourceExtName = this.matchFileExtName(extName);
+            if (sourceExtName.length === 0) {
+                return;
+            }
+            const sourceFile = dirName + "/" + fileName + sourceExtName;
+            let funcDefinitions = "";
+            for (const funcSig of funcs) {
+                funcDefinitions += funcSig.definition + "\n";
+            }
+
+            await this.insertSourceEnd(sourceFile, fileName, extName, funcDefinitions);
+        });
+    }
+
+    private async insertSourceEnd(sourceFile: string, fileName: string, extName: string, content: string) {
+        let workspaceEdit = new WorkspaceEdit();
+        workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
+        const result = await workspace.applyEdit(workspaceEdit);
+
+        if (result) {
+            return workspace.openTextDocument(sourceFile).then(async (doc: TextDocument) => {
+                const textEditor = await window.showTextDocument(doc, 1, true);
+                await textEditor.insertSnippet(new SnippetString("#include \"" + fileName + extName + "\"\n"));
+                return await textEditor.insertSnippet(
+                    new SnippetString("\n" + content), textEditor.document.positionAt(textEditor.document.getText().length));
+            });
+        }
+        if (window.activeTextEditor) {
+            return workspace.openTextDocument(sourceFile).then(async (doc: TextDocument) => {
+                const textEditor = await window.showTextDocument(doc);
+                return await textEditor.insertSnippet(
+                    new SnippetString("\n" + content), textEditor.document.positionAt(textEditor.document.getText().length));
+            });
+        }
+        return;
     }
 
     public async stripCompileCommands(srcPath: string, dstPath: string) {

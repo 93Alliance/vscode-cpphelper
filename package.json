@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -89,6 +89,11 @@
 				"command": "cpphelper.createGetterSetter",
 				"category": "cpphelper",
 				"title": "Create getter and setter function"
+			},
+			{
+				"command": "cpphelper.createSpecialMember",
+				"category": "cpphelper",
+				"title": "Create class special member function"
 			}
 		],
 		"configuration": {
