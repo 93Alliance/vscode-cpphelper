@@ -1,10 +1,10 @@
 import { CompilerOutputer } from './output/compilerOutputer';
 import { ClangdApi } from './lsp/clangd';
 import {
-    commands, Disposable, languages, Position, Range, SnippetString, TextDocument, TextEditor, Uri, ViewColumn, window, workspace,
+    commands, Disposable, languages, Position, Range, SnippetString, TextDocument, Uri, ViewColumn, window, workspace,
     WorkspaceConfiguration, WorkspaceEdit
 } from 'vscode';
-import { Filesystem } from './utils/filesystem';
+import { FileInfo, Filesystem } from './utils/filesystem';
 import { disposeAll, fistLetterUpper, openFile, replaceAll } from './utils/utils';
 import { CmakeLinkProvider } from './output/cmakeLinkProvider';
 
@@ -105,41 +105,9 @@ export class Cpphelper implements Disposable {
             return;
         }
         const uri = editor.document.uri;
-        let extName = path.extname(uri.path);
-        const fileName = path.basename(uri.path, extName);
-        const dirName = path.dirname(uri.path);
-        let sourceExtName = this.matchFileExtName(extName);
-        if (sourceExtName.length === 0) {
-            return;
-        }
+        const fileInfo = Filesystem.fileInfo(uri.path);
 
-        const sourceFile = dirName + "/" + fileName + sourceExtName;
-        let workspaceEdit = new WorkspaceEdit();
-        workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
-        workspace.applyEdit(workspaceEdit).then((result: boolean) => {
-            if (result) {
-                return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
-                    window.showTextDocument(doc, 1, true).then((textEditor: TextEditor) => {
-                        textEditor.insertSnippet(new SnippetString("#include \"" + fileName + extName + "\"\n"))
-                            .then(() => {
-                                textEditor.insertSnippet(
-                                    new SnippetString(funcSignature), textEditor.document.positionAt(textEditor.document.getText().length));
-                            });
-                    });
-                });
-            } else {
-                if (window.activeTextEditor) {
-                    return workspace.openTextDocument(sourceFile).then((doc: TextDocument) => {
-                        window.showTextDocument(doc).then((textEditor: TextEditor) => {
-                            textEditor.insertSnippet(
-                                new SnippetString(funcSignature), textEditor.document.positionAt(textEditor.document.getText().length));
-                        });
-                    });
-                }
-            }
-            return;
-        });
-
+        await this.insertSourceEnd(fileInfo, funcSignature);
     }
 
     // create getter and setter for member Variable
@@ -175,41 +143,40 @@ export class Cpphelper implements Disposable {
                 return;
             }
 
-            let selection = editor.selection;
-            let uri = editor.document.uri;
-            let editWs = new WorkspaceEdit();
-
             let funcDeclarations = "";
             for (const funcSig of funcs) {
                 funcDeclarations += "    " + funcSig.declaration;
             }
 
+            let selection = editor.selection;
+            let uri = editor.document.uri;
+            let editWs = new WorkspaceEdit();
+
             editWs.insert(uri, new Position(selection.end.line + 1, 0), funcDeclarations);
             await workspace.applyEdit(editWs);
 
-            // header ext
-            let extName = path.extname(uri.path);
-            const fileName = path.basename(uri.path, extName);
-            const dirName = path.dirname(uri.path);
-            let sourceExtName = this.matchFileExtName(extName);
-            if (sourceExtName.length === 0) {
-                return;
-            }
-            const sourceFile = dirName + "/" + fileName + sourceExtName;
+            // header
+            const fileInfo = Filesystem.fileInfo(uri.path);
+
             let funcDefinitions = "";
             for (const funcSig of funcs) {
                 funcDefinitions += funcSig.definition;
             }
 
             // source
-            await this.insertSourceEnd(sourceFile, fileName, extName, funcDefinitions);
+            await this.insertSourceEnd(fileInfo, funcDefinitions);
         })
     }
 
     // create class special member
     public async createSpecialMember() {
+        // TODO: support only source
         const editor = window.activeTextEditor;
         if (!editor) {
+            return;
+        }
+
+        if (!Filesystem.isHeader(editor.document.uri.fsPath)) {
             return;
         }
 
@@ -232,35 +199,28 @@ export class Cpphelper implements Disposable {
                 return;
             }
 
-            let uri = editor.document.uri;
-
             let funcDeclarations = "";
             for (const funcSig of funcs) {
                 funcDeclarations += "    " + funcSig.declaration;
             }
 
             let editWs = new WorkspaceEdit();
+            let uri = editor.document.uri;
             editWs.insert(uri, new Position(cursor.line + 1, 0), funcDeclarations);
             await workspace.applyEdit(editWs);
             // header ext
-            let extName = path.extname(uri.path);
-            const fileName = path.basename(uri.path, extName);
-            const dirName = path.dirname(uri.path);
-            let sourceExtName = this.matchFileExtName(extName);
-            if (sourceExtName.length === 0) {
-                return;
-            }
-            const sourceFile = dirName + "/" + fileName + sourceExtName;
+            const fileInfo = Filesystem.fileInfo(uri.path);
             let funcDefinitions = "";
             for (const funcSig of funcs) {
                 funcDefinitions += funcSig.definition + "\n";
             }
 
-            await this.insertSourceEnd(sourceFile, fileName, extName, funcDefinitions);
+            await this.insertSourceEnd(fileInfo,  funcDefinitions);
         });
     }
 
-    private async insertSourceEnd(sourceFile: string, fileName: string, extName: string, content: string) {
+    private async insertSourceEnd(fileInfo: FileInfo, content: string) {
+        const sourceFile = fileInfo.dir + "/" + fileInfo.sourceName;
         let workspaceEdit = new WorkspaceEdit();
         workspaceEdit.createFile(Uri.file(sourceFile), { overwrite: false, ignoreIfExists: true });
         const result = await workspace.applyEdit(workspaceEdit);
@@ -268,7 +228,7 @@ export class Cpphelper implements Disposable {
         if (result) {
             return workspace.openTextDocument(sourceFile).then(async (doc: TextDocument) => {
                 const textEditor = await window.showTextDocument(doc, 1, true);
-                await textEditor.insertSnippet(new SnippetString("#include \"" + fileName + extName + "\"\n"));
+                await textEditor.insertSnippet(new SnippetString("#include \"" + fileInfo.headerName + "\"\n"));
                 return await textEditor.insertSnippet(
                     new SnippetString("\n" + content), textEditor.document.positionAt(textEditor.document.getText().length));
             });
@@ -660,16 +620,6 @@ export class Cpphelper implements Disposable {
                     }
                 );
             });
-        }
-    }
-
-    private matchFileExtName(extName: string): string {
-        if (extName === ".hpp") {
-            return ".cpp";
-        } else if (extName === ".h") {
-            return ".c";
-        } else {
-            return "";
         }
     }
 }
