@@ -50,3 +50,11 @@ export function getByteLen(val: string) {
 export function hasKey(str: string, key: string): boolean {
     return str.indexOf(key) !== -1;
 }
+
+export function space(num: number): string {
+    let s = '';
+    for (let i = 0; i < num; i++) {
+        s += " ";
+    }
+    return s;
+}

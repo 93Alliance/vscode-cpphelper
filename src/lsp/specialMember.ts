@@ -1,5 +1,5 @@
-import { Position } from 'vscode';
-import { findClassFromSymbol, FunctionSignature } from './common';
+import { Position, Range } from 'vscode';
+import { findClassFromSymbol, FunctionSignature, getClassSymbol } from './common';
 
 export const SpecialMemberOptions = [
     'constructor', 'destructor', 'copy constructor',
@@ -15,7 +15,7 @@ export class SpecialMember {
     private classSymbol: any;
     private className: string = '';
     constructor(symbol: any, pos: Position) {
-        this.classSymbol = this.ownerClass(findClassFromSymbol(symbol), pos);
+        this.classSymbol = getClassSymbol(findClassFromSymbol(symbol), new Range(pos, pos));
         if (this.classSymbol) {
             this.className = this.classSymbol.name;
         }
@@ -54,6 +54,11 @@ export class SpecialMember {
             }
         }
         return funcs;
+    }
+
+    public classRange(): Range {
+        const r = this.classSymbol.range;
+        return new Range(r.start.line, r.start.character, r.end.line, r.end.character);
     }
 
 
@@ -97,15 +102,5 @@ export class SpecialMember {
             declaration: `${this.className}& operator=(${this.className}&& other) noexcept;\n`,
             definition: `${this.className}& ${this.className}::operator=(${this.className}&& other) noexcept\n{\n}\n`
         };
-    }
-
-
-    private ownerClass(cs: any[], target: Position): any {
-        for (const c of cs) {
-            if (target.line >= c.range.start.line && target.line <= c.range.end.line) {
-                return c;
-            }
-        }
-        return null;
     }
 }

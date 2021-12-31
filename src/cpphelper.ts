@@ -5,7 +5,7 @@ import {
     WorkspaceConfiguration, WorkspaceEdit
 } from 'vscode';
 import { FileInfo, Filesystem } from './utils/filesystem';
-import { disposeAll, fistLetterUpper, openFile, replaceAll } from './utils/utils';
+import { disposeAll, fistLetterUpper, openFile, replaceAll, space } from './utils/utils';
 import { CmakeLinkProvider } from './output/cmakeLinkProvider';
 
 import * as fs from 'fs';
@@ -143,16 +143,23 @@ export class Cpphelper implements Disposable {
                 return;
             }
 
+            const publicRange = gs.publicAccessRange();
+            const spaceStr = space(publicRange.end.character);
+
             let funcDeclarations = "";
             for (const funcSig of funcs) {
-                funcDeclarations += "    " + funcSig.declaration;
+                funcDeclarations += spaceStr + funcSig.declaration;
             }
 
-            let selection = editor.selection;
+            // let selection = editor.selection;
             let uri = editor.document.uri;
             let editWs = new WorkspaceEdit();
 
-            editWs.insert(uri, new Position(selection.end.line + 1, 0), funcDeclarations);
+            editWs.insert(
+                uri, 
+                new Position(publicRange.end.line, 0),
+                funcDeclarations
+            );
             await workspace.applyEdit(editWs);
 
             // header
@@ -170,7 +177,6 @@ export class Cpphelper implements Disposable {
 
     // create class special member
     public async createSpecialMember() {
-        // TODO: support only source
         const editor = window.activeTextEditor;
         if (!editor) {
             return;
@@ -199,9 +205,10 @@ export class Cpphelper implements Disposable {
                 return;
             }
 
+            const classRange = sm.classRange();
             let funcDeclarations = "";
             for (const funcSig of funcs) {
-                funcDeclarations += "    " + funcSig.declaration;
+                funcDeclarations += space(classRange.start.character + 4) + funcSig.declaration;
             }
 
             let editWs = new WorkspaceEdit();
@@ -215,7 +222,7 @@ export class Cpphelper implements Disposable {
                 funcDefinitions += funcSig.definition + "\n";
             }
 
-            await this.insertSourceEnd(fileInfo,  funcDefinitions);
+            await this.insertSourceEnd(fileInfo, funcDefinitions);
         });
     }
 
