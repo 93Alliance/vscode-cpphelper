@@ -124,7 +124,11 @@ function extractRtnType(cppRange: string, funcName: string): string {
     } else if (hasKey(cppRange, "template<")) {
         result = '';
     } else { // global normal function
-        result = cppRange.substring(0, cppRange.indexOf(funcName + "(") - 1);
+        let start = 0;
+        if (hasKey(cppRange, "// In")) {
+            start = cppRange.indexOf("\n") + 1;
+        }
+        result = cppRange.substring(start, cppRange.indexOf(funcName + "(") - 1);
     }
     return result;
 }
