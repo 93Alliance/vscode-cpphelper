@@ -21,6 +21,9 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
+### 0.1.9
+- fix: c language global function implementation error.
+
 ### 0.1.1
 - fix: when compileCommandsStrip is empty, strip compile commands is not executed.
 - fix: the created file is not open, header guard function is invalid.
