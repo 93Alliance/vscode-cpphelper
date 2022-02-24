@@ -24,8 +24,8 @@ export class CompilerOutputer implements DocumentLinkProvider, Disposable {
     private startHeader = "[build] ";
     private localLinkPattern: RegExp;
     private bcoLinkPattern: RegExp;
-    private errKeys = [": error ", ": 致命错误：", ": 错误："];
-    private warnKeys = [": 警告：", ": warning "];
+    private errKeys = [": error ", ": 致命错误：", ": 错误：", "error: "];
+    private warnKeys = [": 警告：", ": warning ", "warning: "];
     private processCwd: string;
 
     constructor() {
