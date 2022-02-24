@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.1.9",
+	"version": "0.2.0",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -226,7 +226,7 @@
 				"aliases": [
 					"log"
 				],
-				"configuration": "./language-configuration.json",
+				"configuration": "./log.configuration.json",
 				"mimetypes": [
 					"log",
 					"text/log",

@@ -3,7 +3,17 @@ import * as vscode from 'vscode';
 import { ClangdApi } from './lsp/clangd';
 
 function importClangdApi(clangd: vscode.Extension<any>, clangApi: ClangdApi) {
-    if (clangd.isActive) { clangApi.ast = clangd.exports.ast; }
+    if (clangd.isActive) { 
+        if (clangd.exports.ast) {
+            clangApi.ast = clangd.exports.ast;
+        }
+        if (clangd.exports.hover) {
+            clangApi.hover = clangd.exports.hover;
+        }
+        if (clangd.exports.documentSymbol) {
+            clangApi.documentSymbol = clangd.exports.documentSymbol;
+        }
+    }
     else {
         const si = setInterval(() => {
             if (clangd.isActive) {

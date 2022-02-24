@@ -128,7 +128,8 @@ function extractRtnType(cppRange: string, funcName: string): string {
         if (hasKey(cppRange, "// In")) {
             start = cppRange.indexOf("\n") + 1;
         }
-        result = cppRange.substring(start, cppRange.indexOf(funcName + "(") - 1);
+        result = cppRange.substring(start, cppRange.indexOf(funcName + "("));
+        console.log(result);
     }
     return result;
 }
