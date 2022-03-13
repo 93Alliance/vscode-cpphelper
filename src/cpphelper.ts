@@ -167,7 +167,7 @@ export class Cpphelper implements Disposable {
 
             let funcDefinitions = "";
             for (const funcSig of funcs) {
-                funcDefinitions += funcSig.definition;
+                funcDefinitions += funcSig.definition + "\n";
             }
 
             // source
