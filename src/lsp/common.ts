@@ -87,7 +87,7 @@ export function getPublicAccessRange(classSymbol: any, editor: TextEditor): Rang
         }
         // until match public or private or protected or empty
         if (nline.match(PublicAccessRegx) || nline.match(PrivateAccessRegx) || nline.match(ProtectedAccessRegx)) {
-            range.end.line = classRange.start.line + i - 1;
+            range.end.line = classRange.start.line + i;
             break;
         } 
     }

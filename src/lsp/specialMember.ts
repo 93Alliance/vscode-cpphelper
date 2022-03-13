@@ -17,6 +17,7 @@ export class SpecialMember {
     private readonly _editor;
     constructor(symbol: any, pos: Position, editor: TextEditor) {
         this._editor = editor;
+        // drop namespace
         this.classSymbol = getClassSymbol(findClassFromSymbol(symbol), new Range(pos, pos));
         if (this.classSymbol) {
             this.className = this.classSymbol.name;

@@ -21,6 +21,10 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 ## Release Notes
 
+### 0.2.3
+- add: setter getter function supported source file.
+- add: special function supported source file.
+
 ### 0.1.9
 - fix: c language global function implementation error.
 

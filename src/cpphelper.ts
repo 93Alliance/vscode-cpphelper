@@ -116,9 +116,6 @@ export class Cpphelper implements Disposable {
         if (!editor) {
             return;
         }
-        if (!Filesystem.isHeader(editor.document.uri.fsPath)) {
-            return;
-        }
 
         const ast: any = await this._clangd.ast();
         if (!ast || ast.kind != 'Field' || ast.role != 'declaration') { return; }
@@ -182,10 +179,6 @@ export class Cpphelper implements Disposable {
             return;
         }
 
-        if (!Filesystem.isHeader(editor.document.uri.fsPath)) {
-            return;
-        }
-
         // get cursor position
         const cursor = editor.selection.end;
         const symbol: any = await this._clangd.documentSymbol();
@@ -196,6 +189,11 @@ export class Cpphelper implements Disposable {
             window.showWarningMessage("Not found valid class!");
             return;
         }
+
+        // if (!Filesystem.isHeader(editor.document.uri.fsPath)) {
+        //     return;
+        // }
+
         window.showQuickPick(SpecialMemberOptions, { canPickMany: true }).then(async (values: any) => {
             if (!values || values.length === 0) {
                 return;
