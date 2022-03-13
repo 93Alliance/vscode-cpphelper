@@ -144,7 +144,7 @@ export class Cpphelper implements Disposable {
             }
 
             const publicRange = gs.publicAccessRange();
-            const spaceStr = space(publicRange.end.character);
+            const spaceStr = space(publicRange.start.character + 4);
 
             let funcDeclarations = "";
             for (const funcSig of funcs) {
@@ -156,7 +156,7 @@ export class Cpphelper implements Disposable {
             let editWs = new WorkspaceEdit();
 
             editWs.insert(
-                uri, 
+                uri,
                 new Position(publicRange.end.line, 0),
                 funcDeclarations
             );
@@ -191,7 +191,7 @@ export class Cpphelper implements Disposable {
         const symbol: any = await this._clangd.documentSymbol();
         if (!symbol) { return; }
 
-        const sm = new SpecialMember(symbol, cursor);
+        const sm = new SpecialMember(symbol, cursor, editor);
         if (!sm.isValid()) {
             window.showWarningMessage("Not found valid class!");
             return;
@@ -205,15 +205,17 @@ export class Cpphelper implements Disposable {
                 return;
             }
 
-            const classRange = sm.classRange();
+            const publicRange = sm.publicAccessRange();
             let funcDeclarations = "";
+            const spaceStr = space(publicRange.end.character + 4);
             for (const funcSig of funcs) {
-                funcDeclarations += space(classRange.start.character + 4) + funcSig.declaration;
+                funcDeclarations += spaceStr + funcSig.declaration;
             }
 
             let editWs = new WorkspaceEdit();
             let uri = editor.document.uri;
-            editWs.insert(uri, new Position(cursor.line + 1, 0), funcDeclarations);
+            // start.line value is public position, change to next line
+            editWs.insert(uri, new Position(publicRange.start.line + 1, 0), funcDeclarations);
             await workspace.applyEdit(editWs);
             // header ext
             const fileInfo = Filesystem.fileInfo(uri.path);
@@ -397,6 +399,31 @@ export class Cpphelper implements Disposable {
         catch (err) {
             console.error(err);
         }
+    }
+
+    public async createSubProject() {
+        // try {
+        //     let projectTypes = ["dynamic", "executable"];
+        //     window.showQuickPick(projectTypes, { canPickMany: false }).then(async (values: any) => {
+        //         if (!values || values.length === 0) {
+        //             return;
+        //         }
+        //         window.showInputBox({
+        //             password: false, // 输入内容是否是密码
+        //             ignoreFocusOut: false, // 默认false，设置为true时鼠标点击别的地方输入框不会消失
+        //             placeHolder: '', // 在输入框内的提示信息
+        //             prompt: 'Please input project name', // 在输入框下方的提示信息
+        //         }).then(async (className) => {
+        //             if (className === undefined) {
+        //                 return;
+        //             }
+
+        //         });
+        //     });
+        // }
+        // catch (err) {
+        //     console.error(err);
+        // }
     }
 
     // insert region to selection

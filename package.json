@@ -9,7 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/93Alliance/vscode-cpphelper"
 	},
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"engines": {
 		"vscode": "^1.62.0"
 	},
@@ -93,7 +93,7 @@
 			{
 				"command": "cpphelper.createSpecialMember",
 				"category": "cpphelper",
-				"title": "Create class special member function"
+				"title": "Create special function"
 			}
 		],
 		"configuration": {

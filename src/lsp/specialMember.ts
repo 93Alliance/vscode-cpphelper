@@ -1,5 +1,5 @@
-import { Position, Range } from 'vscode';
-import { findClassFromSymbol, FunctionSignature, getClassSymbol } from './common';
+import { Position, Range, TextEditor } from 'vscode';
+import { findClassFromSymbol, FunctionSignature, getClassSymbol, getPublicAccessRange } from './common';
 
 export const SpecialMemberOptions = [
     'constructor', 'destructor', 'copy constructor',
@@ -14,7 +14,9 @@ export type SpecialMemberOption =
 export class SpecialMember {
     private classSymbol: any;
     private className: string = '';
-    constructor(symbol: any, pos: Position) {
+    private readonly _editor;
+    constructor(symbol: any, pos: Position, editor: TextEditor) {
+        this._editor = editor;
         this.classSymbol = getClassSymbol(findClassFromSymbol(symbol), new Range(pos, pos));
         if (this.classSymbol) {
             this.className = this.classSymbol.name;
@@ -102,5 +104,19 @@ export class SpecialMember {
             declaration: `${this.className}& operator=(${this.className}&& other) noexcept;\n`,
             definition: `${this.className}& ${this.className}::operator=(${this.className}&& other) noexcept\n{\n}\n`
         };
+    }
+
+    public publicAccessRange() {
+        const range = getPublicAccessRange(this.classSymbol, this._editor)
+        const classRange = this.classSymbol.range;
+        if (range.start.line == classRange.start.line && range.end.line == classRange.end.line) {
+            return new Range(
+                range.start.line + 1, // next line is '{'
+                range.start.character,
+                range.end.line,
+                range.end.character
+            );
+        }
+        return range;
     }
 }

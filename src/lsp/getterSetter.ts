@@ -1,6 +1,6 @@
 import { Range, TextEditor, workspace } from "vscode";
 import { fistLetterUpper, hasKey } from "../utils/utils";
-import { findClassFromSymbol, FunctionSignature, getClassSymbol } from "./common";
+import { findClassFromSymbol, FunctionSignature, getClassSymbol, getPublicAccessRange } from "./common";
 
 // ### field `m_defaultVal`  
 // ---
@@ -22,10 +22,6 @@ export interface MemberSignature {
     className: string;
     isBuiltin: boolean;
 }
-
-const PublicAccessRegx = new RegExp("^public(\\sslots)?:.*");
-const PrivateAccessRegx = new RegExp("^private:.*");
-const ProtectedAccessRegx = new RegExp("^protected:.*");
 
 export class GetterSetter {
     private readonly _hover;
@@ -207,47 +203,20 @@ export class GetterSetter {
         return false;
     }
 
-    public publicAccessRange() {
+    public publicAccessRange(): Range {
+        const range = getPublicAccessRange(this.classSymbol, this._editor)
+        // if range equal to range of the class, mean to not found public range.
+        // set range to editor selection
         const classRange = this.classSymbol.range;
-        let content = '';
-        try {
-            content = this._editor.document.getText(
-                new Range(classRange.start.line, classRange.start.character, classRange.end.line, classRange.end.character)
+        if (range.start.line == classRange.start.line && range.end.line == classRange.end.line) {
+            return new Range(
+                this._editor.selection.start.line + 1,
+                range.start.character,
+                this._editor.selection.start.line + 1,
+                range.end.character
             );
-        } catch (error) {
-            console.log(error);
         }
-
-        const lines = content.split("\n");
-        let publicMatch: any = null;
-        const range = {
-            start: { line: 0, character: classRange.start.character + 4 },
-            end: { line: 0, character: classRange.start.character + 4 }
-        };
-
-        let hasStart = false;
-        let hasEnd = false;
-        for (let i = 0; i < lines.length; i++) {
-            const nline = lines[i].substring(classRange.start.character);
-            // until matched public
-            if (!publicMatch) {
-                publicMatch = nline.match(PublicAccessRegx);
-                range.start.line = classRange.start.line + i;
-                hasStart = true;
-                continue;
-            }
-            // until match public or private or protected or empty
-            if (nline.match(PublicAccessRegx) || nline.match(PrivateAccessRegx) || nline.match(ProtectedAccessRegx)) {
-                range.end.line = classRange.start.line + i - 1;
-                hasEnd = true;
-                break;
-            }
-        }
-        if (!hasStart) { return this._editor.selection; }
-        if (hasStart && !hasEnd) {
-            range.end.line = this._editor.selection.end.line;
-        }
-        return new Range(range.start.line, range.start.character, range.end.line, range.end.character);
+        return range;
     }
 }
 
