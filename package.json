@@ -218,7 +218,7 @@
 					"default": [],
 					"description": "Added builtin type"
 				},
-				"cpphelper.createSpecialMemberWithoutImpl": {
+				"cpphelper.createSpecialMemberWithImpl": {
 					"type": "boolean",
 					"default": false,
 					"description": "Whether the implementation is automatically generated when a special function is created"

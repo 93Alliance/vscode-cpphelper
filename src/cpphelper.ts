@@ -216,7 +216,7 @@ export class Cpphelper implements Disposable {
             editWs.insert(uri, new Position(publicRange.start.line + 1, 0), funcDeclarations);
             await workspace.applyEdit(editWs);
 
-            const withoutImpl: boolean = this.config().get("createSpecialMemberWithoutImpl")!;
+            const withoutImpl: boolean = this.config().get("createSpecialMemberWithImpl")!;
             if (withoutImpl) {
                 // header ext
                 const fileInfo = Filesystem.fileInfo(uri.path);
