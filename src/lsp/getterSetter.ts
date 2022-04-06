@@ -1,5 +1,5 @@
 import { Range, TextEditor, workspace } from "vscode";
-import { fistLetterUpper, hasKey } from "../utils/utils";
+import { fistLetterUpper, hasKey, space } from "../utils/utils";
 import { findClassFromSymbol, FunctionSignature, getClassSymbol, getPublicAccessRange } from "./common";
 
 // ### field `m_defaultVal`  
@@ -13,7 +13,13 @@ import { findClassFromSymbol, FunctionSignature, getClassSymbol, getPublicAccess
 // private: std::any m_defaultVal {}
 // ```
 
-export type GetterSetterOption = 'Getter & Setter' | 'Getter' | 'Setter';
+export type GetterSetterOption =
+    'Getter & Setter in hpp' |
+    'Getter & Setter in cpp' |
+    'Getter in hpp' |
+    'Getter in cpp' |
+    'Setter in hpp' |
+    'Setter in cpp';
 
 export interface MemberSignature {
     type: string;
@@ -31,6 +37,7 @@ export class GetterSetter {
     private readonly _editor;
     private classSymbol: any;
     private memberSig: MemberSignature;
+    private _publicAccessRange: Range;
 
     constructor(hover: string, ast: any, symbol: any, editor: TextEditor) {
         this._hover = hover;
@@ -48,6 +55,7 @@ export class GetterSetter {
         this.classSymbol = getClassSymbol(findClassFromSymbol(symbol), ast.range);
         this.extractMemberSignature(this._hover);
         this.checkBuiltin(this._ast);
+        this._publicAccessRange = this.getPublicAccessRange();
     }
 
     public isBuiltin(): boolean {
@@ -58,14 +66,17 @@ export class GetterSetter {
         const opions: string[] = [];
         const hasGetter = this.hasGetterDefinition();
         const hasSetter = this.hasSetterDefinition();
+        if (!hasGetter && !hasSetter) {
+            opions.push('Getter & Setter in hpp');
+            opions.push('Getter & Setter in cpp');
+        }
         if (!hasGetter) {
-            opions.push('Getter');
+            opions.push('Getter in hpp');
+            opions.push('Getter in cpp');
         }
         if (!hasSetter) {
-            opions.push('Setter');
-        }
-        if (!hasGetter && !hasSetter) {
-            opions.push('Getter & Setter');
+            opions.push('Setter in hpp');
+            opions.push('Setter in cpp');
         }
 
         return opions;
@@ -79,26 +90,40 @@ export class GetterSetter {
             return funcs;
         }
 
-        let genGetter = () => {
+        let genGetter = (inCpp: boolean) => {
             let func: FunctionSignature = {
                 declaration: "",
                 definition: ""
             };
-            // definition
-            if (this.memberSig.isBuiltin) {
-                func.definition = `${sig.type} ${sig.className}::${sig.name}() const`;
-                // declaration
-                func.declaration = `${sig.type} ${sig.name}() const;\n`;
+           
+            if (inCpp) {
+                // definition
+                if (this.memberSig.isBuiltin) {
+                    func.definition = `${sig.type} ${sig.className}::${sig.name}() const`;
+                    // declaration
+                    func.declaration = `${sig.type} ${sig.name}() const;\n`;
+                } else {
+                    func.definition = `const ${sig.type}& ${sig.className}::${sig.name}() const`;
+                    func.declaration = `const ${sig.type}& ${sig.name}() const;\n`
+                }
+                // add implement
+                func.definition += `\n{\n    return this->${sig.oriname};\n}\n`
             } else {
-                func.definition = `const ${sig.type}& ${sig.className}::${sig.name}() const`;
-                func.declaration = `const ${sig.type}& ${sig.name}() const;\n`
+                if (this.memberSig.isBuiltin) {
+                    // declaration
+                    func.declaration = `${sig.type} ${sig.name}() const`;
+                } else {
+                    func.declaration = `const ${sig.type}& ${sig.name}() const`
+                }
+                // add implement
+                const spaceStr = space(this._publicAccessRange.start.character + 4);
+                func.declaration += `\n${spaceStr}{\n${spaceStr}    return this->${sig.oriname};\n${spaceStr}}\n`
             }
-            // add implement
-            func.definition += `\n{\n    return this->${sig.oriname};\n}\n`
+
             funcs.push(func);
         }
 
-        let genSetter = () => {
+        let genSetter = (inCpp: boolean) => {
             let param = "";
             const paramName = `new${fistLetterUpper(sig.name)}`;
             if (this.memberSig.isBuiltin) {
@@ -110,23 +135,34 @@ export class GetterSetter {
                 declaration: "",
                 definition: ""
             };
-            func.definition = `void ${sig.className}::set${fistLetterUpper(sig.name)}(${param})`;
-            func.declaration = `void set${fistLetterUpper(sig.name)}(${param});\n`;
-            func.definition += `\n{\n    this->${sig.oriname} = ${paramName};\n}\n`;
+            if (inCpp) {
+                func.definition = `void ${sig.className}::set${fistLetterUpper(sig.name)}(${param})`;
+                func.declaration = `void set${fistLetterUpper(sig.name)}(${param});\n`;
+                func.definition += `\n{\n    this->${sig.oriname} = ${paramName};\n}\n`;
+            } else {
+                func.declaration = `void set${fistLetterUpper(sig.name)}(${param})`;
+                const spaceStr = space(this._publicAccessRange.start.character + 4);
+                func.declaration += `\n${spaceStr}{\n${spaceStr}    this->${sig.oriname} = ${paramName};\n${spaceStr}}\n`;
+            }
+
             funcs.push(func);
         }
 
 
         switch (option) {
-            case 'Getter':
-                genGetter();
+            case 'Getter in cpp':
+                genGetter(true);
                 break;
-            case 'Setter':
-                genSetter();
+            case 'Getter in hpp':
+                genGetter(false);
                 break;
-            case 'Getter & Setter':
-                genGetter();
-                genSetter();
+            case 'Getter & Setter in hpp':
+                genGetter(false);
+                genSetter(false);
+                break;
+            case 'Getter & Setter in cpp':
+                genGetter(true);
+                genSetter(true);
                 break;
         }
 
@@ -204,6 +240,10 @@ export class GetterSetter {
     }
 
     public publicAccessRange(): Range {
+        return this._publicAccessRange;
+    }
+
+    private getPublicAccessRange(): Range {
         const range = getPublicAccessRange(this.classSymbol, this._editor)
         // if range equal to range of the class, mean to not found public range.
         // set range to editor selection

@@ -159,16 +159,20 @@ export class Cpphelper implements Disposable {
             );
             await workspace.applyEdit(editWs);
 
-            // header
-            const fileInfo = Filesystem.fileInfo(uri.path);
+            if (value == 'Getter & Setter in cpp' ||
+                value == 'Getter in cpp' ||
+                value == 'Setter in cpp') {
+                // header
+                const fileInfo = Filesystem.fileInfo(uri.path);
 
-            let funcDefinitions = "";
-            for (const funcSig of funcs) {
-                funcDefinitions += funcSig.definition + "\n";
+                let funcDefinitions = "";
+                for (const funcSig of funcs) {
+                    funcDefinitions += funcSig.definition + "\n";
+                }
+
+                // source
+                await this.insertSourceEnd(fileInfo, funcDefinitions);
             }
-
-            // source
-            await this.insertSourceEnd(fileInfo, funcDefinitions);
         })
     }
 
